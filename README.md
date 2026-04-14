@@ -1,51 +1,51 @@
 # LeetCode Notes
 
-本地刷题笔记系统，支持从 LeetCode 同步已做题目、记录做题状态、写 Markdown 笔记、管理独立笔记本、查看刷题热力图。
+A local note-taking system for LeetCode practice. Sync solved problems from LeetCode, track your progress, write Markdown notes, manage a standalone notebook, and visualize your activity with a heatmap.
 
-## 目录结构
+## Project Structure
 
 ```
 leetcode_notes/
-├── server/       # Node.js 后端（Express + SQLite）
-├── client/       # React 前端
-├── extension/    # Chrome 插件（从浏览器同步 LeetCode 数据）
-└── start.sh      # 快速启动后端
+├── server/       # Node.js backend (Express + SQLite)
+├── client/       # React frontend
+├── extension/    # Chrome extension (syncs data from LeetCode)
+└── start.sh      # Quick start script for the backend
 ```
 
-## 首次使用
+## Getting Started
 
-### 1. 配置 LeetCode Session
+### 1. Configure LeetCode Session
 
 ```bash
 cp server/config.example.json server/config.json
 ```
 
-编辑 `server/config.json`，填入你的 LeetCode session cookie。
+Edit `server/config.json` and paste your LeetCode session cookie.
 
-获取方式：登录 leetcode.com → 打开开发者工具 → Application → Cookies → 复制 `LEETCODE_SESSION` 的值。
+To get it: log in to leetcode.com → open DevTools → Application → Cookies → copy the value of `LEETCODE_SESSION`.
 
-### 2. 启动后端
+### 2. Start the Backend
 
 ```bash
 cd server
 npm install
 node index.js
-# 或者直接运行 ./start.sh
+# or simply run ./start.sh
 ```
 
-后端监听 http://localhost:3001
+The backend listens on http://localhost:3001
 
-**设置开机自启（推荐）：**
+**Auto-start on boot (recommended):**
 
 ```bash
 npm install -g pm2
 cd server
 pm2 start index.js --name leetcode-notes
-pm2 startup   # 按提示执行输出的命令
+pm2 startup   # follow the printed instructions
 pm2 save
 ```
 
-### 3. 启动前端
+### 3. Start the Frontend
 
 ```bash
 cd client
@@ -53,64 +53,64 @@ npm install
 npm start
 ```
 
-前端访问 http://localhost:3000
+The frontend is available at http://localhost:3000
 
-### 4. 安装 Chrome 插件（可选）
+### 4. Install the Chrome Extension (Optional)
 
-1. 打开 Chrome → 地址栏输入 `chrome://extensions/`
-2. 开启右上角「开发者模式」
-3. 点击「加载已解压的扩展程序」
-4. 选择 `extension/` 目录
-5. 确保已登录 leetcode.com
+1. Open Chrome → navigate to `chrome://extensions/`
+2. Enable "Developer mode" in the top right
+3. Click "Load unpacked"
+4. Select the `extension/` directory
+5. Make sure you are logged in to leetcode.com
 
-### 5. 同步数据
+### 5. Sync Data
 
-有两种方式同步 LeetCode 题目：
-- **网页端**：首页点击「同步题目」按钮
-- **Chrome 插件**：点击工具栏插件图标 →「立即同步」
-- 后端每天 12:00 自动同步一次（需保持后端运行）
+There are two ways to sync problems from LeetCode:
+- **Web UI**: Click the "Sync" button on the homepage
+- **Chrome extension**: Click the extension icon → "Sync Now"
+- The backend also auto-syncs daily at 12:00 PM (requires the server to be running)
 
-## 功能
+## Features
 
-### 题目管理
+### Problem Management
 
-| 功能 | 说明 |
-|------|------|
-| 题目同步 | 从 LeetCode 拉取已通过题目、题目描述 |
-| 题目搜索 | 按题号或题目名称搜索 |
-| 筛选排序 | 按难度、状态、标签筛选，支持按题号/标题/最近尝试排序 |
-| 随机抽题 | 在当前筛选结果中随机抽一题 |
-| LeetCode 跳转 | 题目详情页可直接跳转到 LeetCode 原题 |
+| Feature | Description |
+|---------|-------------|
+| Problem Sync | Pull solved problems and descriptions from LeetCode |
+| Search | Search by problem number or title |
+| Filter & Sort | Filter by difficulty, status, or tag; sort by number, title, or last attempt |
+| Random Pick | Randomly pick a problem from the current filtered results |
+| LeetCode Link | Jump directly to the original problem on LeetCode from the detail page |
 
-### 做题记录
+### Progress Tracking
 
-| 功能 | 说明 |
-|------|------|
-| 状态标记 | 完全忘记 / 记得思路 / 有小错误 / 完美通过 |
-| 历史记录 | 每次标记都会记录日期，可查看进步轨迹，支持删除单条记录 |
-| 统计概览 | 首页显示各状态总数和进度条 |
-| 热力图 | 首页展示提交热力图，类似 GitHub contribution graph |
+| Feature | Description |
+|---------|-------------|
+| Status Marking | Forgotten / Remembered the idea / Minor errors / Perfect |
+| Attempt History | Each status mark is timestamped; individual records can be deleted |
+| Stats Overview | Homepage shows counts per status and a progress bar |
+| Heatmap | Submission heatmap on the homepage, similar to GitHub's contribution graph |
 
-### 笔记系统
+### Notes
 
-| 功能 | 说明 |
-|------|------|
-| 题目笔记 | 在每道题的详情页写 Markdown 笔记，支持代码高亮 |
-| 备注 | 每道题支持纯文本备注 |
-| 标签 | 自定义标签，逗号分隔（如：数组, 双指针） |
-| 图片粘贴 | Ctrl+V 直接粘贴截图，自动上传保存 |
-| 自动保存 | 笔记编辑后 1 秒自动保存 |
+| Feature | Description |
+|---------|-------------|
+| Problem Notes | Write Markdown notes on each problem's detail page with syntax highlighting |
+| Remarks | Plain-text remarks field per problem |
+| Tags | Custom tags, comma-separated (e.g. Array, Two Pointers) |
+| Image Paste | Ctrl+V to paste screenshots directly; images are auto-uploaded |
+| Auto-save | Notes are automatically saved 1 second after editing |
 
-### 独立笔记本
+### Standalone Notebook
 
-| 功能 | 说明 |
-|------|------|
-| 文件夹管理 | 支持创建文件夹和子文件夹，树形目录结构 |
-| Markdown 编辑 | 独立笔记同样支持 Markdown 和图片粘贴 |
-| 搜索 | 按标题搜索笔记 |
+| Feature | Description |
+|---------|-------------|
+| Folder Management | Create folders and subfolders in a tree structure |
+| Markdown Editor | Full Markdown support with image paste |
+| Search | Search notes by title |
 
-## 数据存储
+## Data Storage
 
-- 数据库：`server/leetcode.db`（SQLite，单文件，已在 .gitignore 中排除）
-- 图片：`server/uploads/`
-- 配置：`server/config.json`（含敏感信息，已在 .gitignore 中排除）
+- Database: `server/leetcode.db` (SQLite, single file, excluded via .gitignore)
+- Images: `server/uploads/`
+- Config: `server/config.json` (contains sensitive data, excluded via .gitignore)
