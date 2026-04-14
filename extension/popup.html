@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { width: 260px; padding: 16px; font-family: -apple-system, sans-serif; margin: 0; }
+    h2 { margin: 0 0 12px; font-size: 15px; color: #6366f1; }
+    .info { font-size: 12px; color: #6b7280; margin-bottom: 12px; line-height: 1.6; }
+    button {
+      width: 100%; padding: 9px; background: #6366f1; color: #fff;
+      border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    button:disabled { background: #a5b4fc; cursor: default; }
+    #status { margin-top: 10px; font-size: 12px; color: #6b7280; text-align: center; min-height: 18px; }
+    .link { font-size: 12px; color: #6366f1; text-align: center; margin-top: 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>LeetCode Notes Sync</h2>
+  <div class="info" id="lastSync">加载中...</div>
+  <button id="syncBtn">立即同步</button>
+  <div id="status"></div>
+  <div class="link" id="openApp">打开笔记网页 →</div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-react-app:*)",
+      "Bash(chmod +x /Users/yuexishen/Desktop/其它/leetcode_notes/start.sh)",
+      "Bash(node server/index.js)",
+      "Bash(curl -s http://localhost:3001/api/stats)",
+      "Bash(kill %1)",
+      "Bash(curl -s -X POST http://localhost:3001/api/sync)",
+      "Bash(node index.js)",
+      "Bash(pkill -9 -f \"node\")",
+      "Bash(npm install:*)",
+      "Bash(pkill -9 -f \"node index.js\")",
+      "Bash(curl -s -X DELETE http://localhost:3001/api/records/999)",
+      "Bash(node -e \"const db = require\\('./db'\\); const rows = db.prepare\\('SELECT p.id, p.title, GROUP_CONCAT\\(DISTINCT t.name\\) AS tags FROM problems p LEFT JOIN problem_tags pt ON p.id = pt.problem_id LEFT JOIN tags t ON pt.tag_id = t.id GROUP BY p.id HAVING tags IS NOT NULL LIMIT 5'\\).all\\(\\); console.log\\(JSON.stringify\\(rows, null, 2\\)\\);\")",
+      "Read(//Users/yuexishen/Downloads/**)",
+      "Bash(sqlite3 server/leetcode.db \"SELECT t.name, COUNT\\(pt.problem_id\\) as cnt FROM tags t LEFT JOIN problem_tags pt ON t.id = pt.tag_id GROUP BY t.id ORDER BY cnt ASC LIMIT 20;\")",
+      "Bash(sqlite3 server/leetcode.db \"DELETE FROM tags WHERE id NOT IN \\(SELECT DISTINCT tag_id FROM problem_tags\\);\")",
+      "Bash(curl -s http://localhost:3001/api/heatmap)",
+      "Bash(kill 20724 35587)",
+      "Bash(node -e ':*)",
+      "Bash(grep -A5 \"\\\\.w-md-editor-text-pre,$\" /Users/yuexishen/Desktop/其它/leetcode_notes/client/node_modules/@uiw/react-md-editor/dist/mdeditor.css)",
+      "Bash(grep -v \"^--$\")"
+    ]
+  }
+}
