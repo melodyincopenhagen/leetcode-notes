@@ -215,6 +215,7 @@ app.get('/api/heatmap', (req, res) => {
     GROUP BY DATE(attempted_at, '-7 hours')
     ORDER BY day ASC
   `).all();
+  res.set('Cache-Control', 'no-store');
   res.json(rows);
 });
 

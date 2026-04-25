@@ -59,6 +59,12 @@ export default function ProblemList() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const onShow = (e) => { if (e.persisted) load(); };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, [load]);
+
   const handleRandom = async () => {
     const params = {};
     if (filters.difficulty) params.difficulty = filters.difficulty;

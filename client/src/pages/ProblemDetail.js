@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import MDEditor from '@uiw/react-md-editor';
 import rehypePrism from 'rehype-prism-plus';
 import remarkBreaks from 'remark-breaks';
-import { getProblem, addRecord, updateLatest, updateTags, uploadImage, deleteRecord } from '../api';
+import { getProblem, addRecord, updateLatest, updateTags, uploadImage, deleteRecord, getRandom } from '../api';
 import StatusBadge, { STATUS_MAP } from '../components/StatusBadge';
 import DifficultyBadge from '../components/DifficultyBadge';
 
@@ -58,20 +58,44 @@ export default function ProblemDetail() {
   return (
     <div style={{ padding: '28px 36px', maxWidth: 1400, margin: '0 auto' }}>
 
-      {/* 返回 */}
-      <button
-        onClick={() => navigate('/')}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: 'none', border: 'none', color: '#888', cursor: 'pointer',
-          fontSize: 13, padding: '6px 0', marginBottom: 20,
-          transition: 'color .15s',
-        }}
-        onMouseEnter={e => e.currentTarget.style.color = '#185FA5'}
-        onMouseLeave={e => e.currentTarget.style.color = '#888'}
-      >
-        ← 返回列表
-      </button>
+      {/* 顶部操作栏 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: 'none', border: 'none', color: '#888', cursor: 'pointer',
+            fontSize: 13, padding: '6px 0',
+            transition: 'color .15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = '#185FA5'}
+          onMouseLeave={e => e.currentTarget.style.color = '#888'}
+        >
+          ← 返回列表
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              const r = await getRandom();
+              if (String(r.data.id) === String(id)) {
+                const r2 = await getRandom();
+                navigate(`/problems/${r2.data.id}`);
+              } else {
+                navigate(`/problems/${r.data.id}`);
+              }
+            } catch {
+              alert('没有可随机的题目');
+            }
+          }}
+          style={{
+            padding: '7px 13px', background: '#185FA5', color: '#fff',
+            border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13,
+            fontWeight: 600, whiteSpace: 'nowrap',
+          }}
+        >
+          🎲 随机一题
+        </button>
+      </div>
 
       {/* 标题区 */}
       <div style={{
