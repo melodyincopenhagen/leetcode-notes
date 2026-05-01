@@ -60,7 +60,7 @@ app.post('/api/sync', async (req, res) => {
 
 // ── 题目列表（支持过滤） ───────────────────────────────────
 app.get('/api/problems', (req, res) => {
-  const { difficulty, status, tag, sort } = req.query;
+  const { difficulty, status, tag, favorite, sort } = req.query;
 
   let query = `
     SELECT
@@ -69,7 +69,8 @@ app.get('/api/problems', (req, res) => {
       r.notes,
       r.remarks,
       r.attempted_at,
-      GROUP_CONCAT(DISTINCT t.name) AS tags
+      GROUP_CONCAT(DISTINCT t.name) AS tags,
+      GROUP_CONCAT(DISTINCT f.name) AS favorites
     FROM problems p
     LEFT JOIN (
       SELECT r1.* FROM records r1
@@ -79,6 +80,8 @@ app.get('/api/problems', (req, res) => {
     ) r ON p.id = r.problem_id
     LEFT JOIN problem_tags pt ON p.id = pt.problem_id
     LEFT JOIN tags t ON pt.tag_id = t.id
+    LEFT JOIN problem_favorites pf ON p.id = pf.problem_id
+    LEFT JOIN favorites f ON pf.favorite_id = f.id
   `;
 
   const conditions = [];
@@ -91,6 +94,10 @@ app.get('/api/problems', (req, res) => {
     conditions.push("r.status = @status"); params.status = status;
   }
   if (tag) { conditions.push("t.name = @tag"); params.tag = tag; }
+  if (favorite) {
+    conditions.push("p.id IN (SELECT pf2.problem_id FROM problem_favorites pf2 JOIN favorites f2 ON pf2.favorite_id = f2.id WHERE f2.name = @favorite)");
+    params.favorite = favorite;
+  }
 
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
   query += ' GROUP BY p.id';
@@ -104,7 +111,11 @@ app.get('/api/problems', (req, res) => {
   }
 
   const rows = db.prepare(query).all(params);
-  res.json(rows.map(r => ({ ...r, tags: r.tags ? r.tags.split(',') : [] })));
+  res.json(rows.map(r => ({
+    ...r,
+    tags: r.tags ? r.tags.split(',') : [],
+    favorites: r.favorites ? r.favorites.split(',') : [],
+  })));
 });
 
 // ── 单题详情 ──────────────────────────────────────────────
@@ -119,7 +130,14 @@ app.get('/api/problems/:id', (req, res) => {
     WHERE pt.problem_id = ?
   `).all(req.params.id).map(r => r.name);
 
-  res.json({ ...problem, records, tags });
+  const favorites = db.prepare(`
+    SELECT f.id, f.name FROM favorites f
+    JOIN problem_favorites pf ON f.id = pf.favorite_id
+    WHERE pf.problem_id = ?
+    ORDER BY f.name
+  `).all(req.params.id);
+
+  res.json({ ...problem, records, tags, favorites });
 });
 
 // ── 添加/更新记录 ─────────────────────────────────────────
@@ -184,6 +202,69 @@ app.put('/api/problems/:id/tags', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── 收藏夹管理 ────────────────────────────────────────────
+// 列出所有收藏夹（含每个收藏夹下的题目数）
+app.get('/api/favorites', (req, res) => {
+  const rows = db.prepare(`
+    SELECT f.id, f.name, COUNT(pf.problem_id) AS count
+    FROM favorites f
+    LEFT JOIN problem_favorites pf ON f.id = pf.favorite_id
+    GROUP BY f.id
+    ORDER BY f.name
+  `).all();
+  res.json(rows);
+});
+
+// 新建收藏夹
+app.post('/api/favorites', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
+  try {
+    const result = db.prepare('INSERT INTO favorites (name) VALUES (?)').run(name.trim());
+    res.json({ id: result.lastInsertRowid, name: name.trim() });
+  } catch (e) {
+    if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') return res.status(400).json({ error: '收藏夹名已存在' });
+    throw e;
+  }
+});
+
+// 重命名收藏夹
+app.put('/api/favorites/:id', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
+  try {
+    const result = db.prepare('UPDATE favorites SET name = ? WHERE id = ?').run(name.trim(), req.params.id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') return res.status(400).json({ error: '收藏夹名已存在' });
+    throw e;
+  }
+});
+
+// 删除收藏夹（同时移除关联）
+app.delete('/api/favorites/:id', (req, res) => {
+  db.transaction(() => {
+    db.prepare('DELETE FROM problem_favorites WHERE favorite_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM favorites WHERE id = ?').run(req.params.id);
+  })();
+  res.json({ ok: true });
+});
+
+// 把题目加入收藏夹
+app.post('/api/problems/:id/favorites/:favoriteId', (req, res) => {
+  db.prepare('INSERT OR IGNORE INTO problem_favorites (problem_id, favorite_id) VALUES (?, ?)')
+    .run(req.params.id, req.params.favoriteId);
+  res.json({ ok: true });
+});
+
+// 把题目移出收藏夹
+app.delete('/api/problems/:id/favorites/:favoriteId', (req, res) => {
+  db.prepare('DELETE FROM problem_favorites WHERE problem_id = ? AND favorite_id = ?')
+    .run(req.params.id, req.params.favoriteId);
+  res.json({ ok: true });
+});
+
 // ── 统计 ──────────────────────────────────────────────────
 app.get('/api/stats', (req, res) => {
   const total = db.prepare('SELECT COUNT(*) as count FROM problems').get().count;
@@ -204,7 +285,34 @@ app.get('/api/stats', (req, res) => {
     WHERE NOT EXISTS (SELECT 1 FROM records r WHERE r.problem_id = p.id)
   `).get().count;
 
-  res.json({ total, statusCounts, untouched });
+  // 按难度统计：总数 / 已做（至少有一条 record）/ 进行中（最近一次状态非 perfect）
+  const byDifficultyRows = db.prepare(`
+    SELECT
+      p.difficulty,
+      COUNT(*) AS total,
+      SUM(CASE WHEN EXISTS (SELECT 1 FROM records r WHERE r.problem_id = p.id) THEN 1 ELSE 0 END) AS solved,
+      SUM(CASE
+        WHEN EXISTS (SELECT 1 FROM records r WHERE r.problem_id = p.id)
+         AND COALESCE((
+           SELECT r1.status FROM records r1
+           WHERE r1.problem_id = p.id
+           ORDER BY r1.attempted_at DESC LIMIT 1
+         ), '') != 'perfect'
+        THEN 1 ELSE 0 END) AS attempting
+    FROM problems p
+    GROUP BY p.difficulty
+  `).all();
+
+  const byDifficulty = { Easy: { total: 0, solved: 0, attempting: 0 }, Medium: { total: 0, solved: 0, attempting: 0 }, Hard: { total: 0, solved: 0, attempting: 0 } };
+  for (const r of byDifficultyRows) {
+    if (byDifficulty[r.difficulty]) {
+      byDifficulty[r.difficulty] = { total: r.total, solved: r.solved || 0, attempting: r.attempting || 0 };
+    }
+  }
+  const solved = byDifficulty.Easy.solved + byDifficulty.Medium.solved + byDifficulty.Hard.solved;
+  const attempting = byDifficulty.Easy.attempting + byDifficulty.Medium.attempting + byDifficulty.Hard.attempting;
+
+  res.json({ total, statusCounts, untouched, solved, attempting, byDifficulty });
 });
 
 // ── 热力图（每天提交次数） ────────────────────────────────
@@ -221,7 +329,7 @@ app.get('/api/heatmap', (req, res) => {
 
 // ── 随机题目 ──────────────────────────────────────────────
 app.get('/api/random', (req, res) => {
-  const { difficulty, status, tag } = req.query;
+  const { difficulty, status, tag, favorite } = req.query;
 
   let query = `
     SELECT p.id FROM problems p
@@ -245,6 +353,10 @@ app.get('/api/random', (req, res) => {
     conditions.push("r.status = @status"); params.status = status;
   }
   if (tag) { conditions.push("t.name = @tag"); params.tag = tag; }
+  if (favorite) {
+    conditions.push("p.id IN (SELECT pf2.problem_id FROM problem_favorites pf2 JOIN favorites f2 ON pf2.favorite_id = f2.id WHERE f2.name = @favorite)");
+    params.favorite = favorite;
+  }
 
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
   query += ' GROUP BY p.id ORDER BY RANDOM() LIMIT 1';

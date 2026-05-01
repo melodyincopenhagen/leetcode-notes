@@ -38,6 +38,21 @@ db.exec(`
     FOREIGN KEY (tag_id) REFERENCES tags(id)
   );
 
+  CREATE TABLE IF NOT EXISTS favorites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS problem_favorites (
+    problem_id INTEGER NOT NULL,
+    favorite_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (problem_id, favorite_id),
+    FOREIGN KEY (problem_id) REFERENCES problems(id),
+    FOREIGN KEY (favorite_id) REFERENCES favorites(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     parent_id INTEGER DEFAULT NULL,

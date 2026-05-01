@@ -13,6 +13,16 @@ export const getRandom = (filters = {}) => api.get('/random', { params: filters 
 export const getTags = () => api.get('/tags');
 export const deleteRecord = (recordId) => api.delete(`/records/${recordId}`);
 
+// ── 收藏夹 ────────────────────────────────────────────────
+export const getFavorites = () => api.get('/favorites');
+export const createFavorite = (name) => api.post('/favorites', { name });
+export const renameFavorite = (id, name) => api.put(`/favorites/${id}`, { name });
+export const deleteFavorite = (id) => api.delete(`/favorites/${id}`);
+export const addProblemToFavorite = (problemId, favoriteId) =>
+  api.post(`/problems/${problemId}/favorites/${favoriteId}`);
+export const removeProblemFromFavorite = (problemId, favoriteId) =>
+  api.delete(`/problems/${problemId}/favorites/${favoriteId}`);
+
 // ── 笔记 ──────────────────────────────────────────────────
 export const getNotes = (search = '') => api.get('/notes', { params: search ? { search } : {} });
 export const getNote = (id) => api.get(`/notes/${id}`);

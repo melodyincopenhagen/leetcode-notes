@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProblems, getRandom, getTags, getStats, getHeatmap } from '../api';
+import {
+  getProblems, getRandom, getTags, getStats, getHeatmap, getFavorites,
+} from '../api';
 import axios from 'axios';
 import StatusBadge, { STATUS_MAP } from '../components/StatusBadge';
 import DifficultyBadge from '../components/DifficultyBadge';
@@ -29,8 +31,9 @@ export default function ProblemList() {
   const navigate = useNavigate();
   const [problems, setProblems] = useState([]);
   const [tags, setTags] = useState([]);
+  const [favorites, setFavorites] = useState([]);
   const [stats, setStats] = useState(null);
-  const [filters, setFilters] = useState({ difficulty: '', status: '', tag: '', sort: '' });
+  const [filters, setFilters] = useState({ difficulty: '', status: '', tag: '', favorite: '', sort: '' });
   const [search, setSearch] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [heatmap, setHeatmap] = useState([]);
@@ -40,6 +43,7 @@ export default function ProblemList() {
     if (filters.difficulty) params.difficulty = filters.difficulty;
     if (filters.status) params.status = filters.status;
     if (filters.tag) params.tag = filters.tag;
+    if (filters.favorite) params.favorite = filters.favorite;
     if (filters.sort) params.sort = filters.sort;
     getProblems(params).then(r => {
       setProblems(r.data);
@@ -53,6 +57,7 @@ export default function ProblemList() {
       }
     });
     getTags().then(r => setTags(r.data));
+    getFavorites().then(r => setFavorites(r.data));
     getStats().then(r => setStats(r.data));
     getHeatmap().then(r => setHeatmap(r.data));
   }, [filters]);
@@ -70,6 +75,7 @@ export default function ProblemList() {
     if (filters.difficulty) params.difficulty = filters.difficulty;
     if (filters.status) params.status = filters.status;
     if (filters.tag) params.tag = filters.tag;
+    if (filters.favorite) params.favorite = filters.favorite;
     try {
       const r = await getRandom(params);
       navigate(`/problems/${r.data.id}`);
@@ -135,6 +141,9 @@ export default function ProblemList() {
         </div>
       )}
 
+      {/* 进度环 */}
+      {stats && stats.byDifficulty && <ProgressRing stats={stats} />}
+
       {/* 进度条 */}
       {stats && (
         <div style={{ marginBottom: 20 }}>
@@ -181,6 +190,10 @@ export default function ProblemList() {
         <select value={filters.tag} onChange={e => setFilter('tag', e.target.value)} style={selectStyle}>
           <option value="">全部标签</option>
           {tags.map(t => <option key={t} value={t}>#{t}</option>)}
+        </select>
+        <select value={filters.favorite} onChange={e => setFilter('favorite', e.target.value)} style={selectStyle}>
+          <option value="">全部收藏夹</option>
+          {favorites.map(f => <option key={f.id} value={f.name}>★ {f.name} ({f.count})</option>)}
         </select>
         <Select options={SORTS} value={filters.sort} onChange={v => setFilter('sort', v)} />
 
@@ -271,9 +284,15 @@ function ProblemRow({ p, last, onClick }) {
         <StatusBadge status={p.status} />
       </td>
       <td style={{ padding: '12px 16px' }}>
-        {p.tags && p.tags.length > 0 && (
+        {((p.tags && p.tags.length > 0) || (p.favorites && p.favorites.length > 0)) && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {p.tags.map(t => <Tag key={t} name={t} />)}
+            {p.favorites && p.favorites.map(f => (
+              <span key={'f-' + f} style={{
+                background: '#fff4d6', color: '#9a6b00',
+                borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 500,
+              }}>★ {f}</span>
+            ))}
+            {p.tags && p.tags.map(t => <Tag key={t} name={t} />)}
           </div>
         )}
       </td>
@@ -327,6 +346,144 @@ const selectStyle = {
   fontSize: 13, cursor: 'pointer', outline: 'none',
   background: '#f9f9f7', color: '#333',
 };
+
+function ProgressRing({ stats }) {
+  const { byDifficulty, total, solved, attempting } = stats;
+  const easy = byDifficulty.Easy;
+  const med = byDifficulty.Medium;
+  const hard = byDifficulty.Hard;
+
+  // SVG 圆环参数
+  const size = 170;
+  const stroke = 9;
+  const r = (size - stroke) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  // 270° 弧（缺口在底部），起点左下
+  const arcSpan = 270;
+  const startAngle = 135; // 角度从 12 点顺时针；135° = 左下
+  const circ = 2 * Math.PI * r;
+  const fullArcLen = circ * (arcSpan / 360);
+
+  const easyTotal = easy.total || 1;
+  const medTotal = med.total || 1;
+  const hardTotal = hard.total || 1;
+
+  // 三段平均分配 270° 弧 —— 每段表示一个难度，填充比例 = solved/total
+  const segLen = fullArcLen / 3;
+  const segs = [
+    { color: '#1D9E75', total: easy.total, solved: easy.solved, ratio: easy.solved / easyTotal },
+    { color: '#F1A62A', total: med.total, solved: med.solved, ratio: med.solved / medTotal },
+    { color: '#E5474B', total: hard.total, solved: hard.solved, ratio: hard.solved / hardTotal },
+  ];
+
+  // 把弧度转 SVG path（沿圆顺时针绘制弧）
+  const angleToXY = (deg) => {
+    const rad = (deg - 90) * Math.PI / 180;
+    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+  };
+
+  // 端点小圆（在每段填充结尾处）
+  const endpointAt = (segIdx, ratio) => {
+    const segStart = startAngle + segIdx * (arcSpan / 3);
+    const a = segStart + (arcSpan / 3) * Math.min(Math.max(ratio, 0), 1);
+    return angleToXY(a);
+  };
+
+  return (
+    <div style={{
+      ...card, padding: '20px 24px', marginBottom: 14,
+      display: 'flex', alignItems: 'center', gap: 32, flexWrap: 'wrap',
+    }}>
+      {/* 圆环 */}
+      <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+        <svg width={size} height={size}>
+          {/* 背景三段 */}
+          {segs.map((s, i) => {
+            const segStart = startAngle + i * (arcSpan / 3);
+            const segEnd = segStart + (arcSpan / 3) - 4; // 段间留 4° 间隙
+            const [x1, y1] = angleToXY(segStart);
+            const [x2, y2] = angleToXY(segEnd);
+            const large = (segEnd - segStart) > 180 ? 1 : 0;
+            return (
+              <path
+                key={'bg' + i}
+                d={`M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`}
+                fill="none"
+                stroke={s.color + '33'}
+                strokeWidth={stroke}
+                strokeLinecap="round"
+              />
+            );
+          })}
+          {/* 填充三段 */}
+          {segs.map((s, i) => {
+            const segStart = startAngle + i * (arcSpan / 3);
+            const fillSpan = (arcSpan / 3 - 4) * Math.min(Math.max(s.ratio, 0), 1);
+            if (fillSpan <= 0) return null;
+            const segEnd = segStart + fillSpan;
+            const [x1, y1] = angleToXY(segStart);
+            const [x2, y2] = angleToXY(segEnd);
+            const large = fillSpan > 180 ? 1 : 0;
+            return (
+              <path
+                key={'fg' + i}
+                d={`M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={stroke}
+                strokeLinecap="round"
+              />
+            );
+          })}
+          {/* 端点小圆点 */}
+          {segs.map((s, i) => {
+            if (s.ratio <= 0) return null;
+            const [px, py] = endpointAt(i, s.ratio);
+            return <circle key={'dot' + i} cx={px} cy={py} r={4} fill={s.color} />;
+          })}
+        </svg>
+        {/* 中心文字 */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#1a1a1a' }}>
+            {solved}<span style={{ fontSize: 13, fontWeight: 500, color: '#888' }}>/{total}</span>
+          </div>
+          <div style={{ fontSize: 12, color: '#1D9E75', marginTop: 2, fontWeight: 600 }}>
+            ✓ Solved
+          </div>
+          <div style={{ fontSize: 11, color: '#888', marginTop: 12 }}>
+            <span style={{ fontWeight: 600, color: '#555' }}>{attempting}</span> Attempting
+          </div>
+        </div>
+      </div>
+
+      {/* 三个难度卡片 */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <DifficultyTile label="Easy" color="#1D9E75" solved={easy.solved} total={easy.total} />
+        <DifficultyTile label="Med." color="#F1A62A" solved={med.solved} total={med.total} />
+        <DifficultyTile label="Hard" color="#E5474B" solved={hard.solved} total={hard.total} />
+      </div>
+    </div>
+  );
+}
+
+function DifficultyTile({ label, color, solved, total }) {
+  return (
+    <div style={{
+      background: '#fafafa', borderRadius: 10, padding: '12px 22px',
+      minWidth: 96, textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color }}>{label}</div>
+      <div style={{ fontSize: 13, color: '#1a1a1a', marginTop: 4, fontWeight: 600 }}>
+        {solved}/{total}
+      </div>
+    </div>
+  );
+}
 
 function Heatmap({ data }) {
   // 构建日期 -> 次数的映射

@@ -3,7 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import MDEditor from '@uiw/react-md-editor';
 import rehypePrism from 'rehype-prism-plus';
 import remarkBreaks from 'remark-breaks';
-import { getProblem, addRecord, updateLatest, updateTags, uploadImage, deleteRecord, getRandom } from '../api';
+import {
+  getProblem, addRecord, updateLatest, updateTags, uploadImage, deleteRecord, getRandom,
+  getFavorites, createFavorite, addProblemToFavorite, removeProblemFromFavorite,
+} from '../api';
 import StatusBadge, { STATUS_MAP } from '../components/StatusBadge';
 import DifficultyBadge from '../components/DifficultyBadge';
 
@@ -15,6 +18,11 @@ export default function ProblemDetail() {
   const [remarks, setRemarks] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [activeTab, setActiveTab] = useState('desc');
+  const [allFavorites, setAllFavorites] = useState([]);
+  const [showFavPicker, setShowFavPicker] = useState(false);
+
+  const loadFavorites = () => getFavorites().then(r => setAllFavorites(r.data));
+  useEffect(() => { loadFavorites(); }, []);
 
   const load = () => getProblem(id).then(r => {
     const p = r.data;
@@ -161,7 +169,52 @@ export default function ProblemDetail() {
             ))}
           </div>
         )}
+
+        {/* 收藏夹 */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
+          <span style={{ fontSize: 12, color: '#888', marginRight: 4 }}>收藏夹：</span>
+          {problem.favorites?.map(f => (
+            <span key={f.id} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              background: '#fff4d6', color: '#9a6b00',
+              borderRadius: 5, padding: '3px 4px 3px 9px', fontSize: 12, fontWeight: 500,
+            }}>
+              ★ {f.name}
+              <button
+                onClick={async () => {
+                  await removeProblemFromFavorite(id, f.id);
+                  load();
+                }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: '#9a6b00', fontSize: 14, padding: '0 4px', lineHeight: 1,
+                }}
+                title="从此收藏夹移除"
+              >×</button>
+            </span>
+          ))}
+          {(!problem.favorites || problem.favorites.length === 0) && (
+            <span style={{ fontSize: 12, color: '#bbb' }}>未加入任何收藏夹</span>
+          )}
+          <button
+            onClick={() => setShowFavPicker(true)}
+            style={{
+              background: '#fff', border: '1px dashed #d0a35e', color: '#9a6b00',
+              borderRadius: 5, padding: '3px 10px', fontSize: 12, cursor: 'pointer',
+            }}
+          >+ 加入收藏夹</button>
+        </div>
       </div>
+
+      {showFavPicker && (
+        <FavoritePicker
+          problemId={id}
+          allFavorites={allFavorites}
+          currentIds={new Set((problem.favorites || []).map(f => f.id))}
+          onClose={() => setShowFavPicker(false)}
+          onChanged={() => { load(); loadFavorites(); }}
+        />
+      )}
 
       {/* 状态 + 历史 */}
       <div style={{
@@ -351,6 +404,85 @@ function NotesEditor({ problemId, initialNotes, remarks, onNotesChange }) {
         previewOptions={previewOptions}
         style={{ height: 'auto' }}
       />
+    </div>
+  );
+}
+
+function FavoritePicker({ problemId, allFavorites, currentIds, onClose, onChanged }) {
+  const [newName, setNewName] = useState('');
+  const handleToggle = async (f) => {
+    if (currentIds.has(f.id)) {
+      await removeProblemFromFavorite(problemId, f.id);
+    } else {
+      await addProblemToFavorite(problemId, f.id);
+    }
+    onChanged();
+  };
+  const handleCreateAndAdd = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    try {
+      const r = await createFavorite(name);
+      await addProblemToFavorite(problemId, r.data.id);
+      setNewName('');
+      onChanged();
+    } catch (e) {
+      alert(e.response?.data?.error || '创建失败');
+    }
+  };
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: '#fff', borderRadius: 12, padding: '20px 24px',
+        width: 400, maxHeight: '80vh', overflow: 'auto',
+        boxShadow: '0 6px 24px rgba(0,0,0,0.15)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>选择收藏夹</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: 18 }}>×</button>
+        </div>
+
+        {allFavorites.length === 0 && (
+          <div style={{ color: '#888', fontSize: 13, padding: '8px 0 14px' }}>暂无收藏夹，新建一个吧 ↓</div>
+        )}
+
+        <div style={{ marginBottom: 14 }}>
+          {allFavorites.map(f => {
+            const checked = currentIds.has(f.id);
+            return (
+              <label key={f.id} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '7px 10px', borderRadius: 6, cursor: 'pointer',
+                background: checked ? '#fff4d6' : 'transparent',
+              }}>
+                <input type="checkbox" checked={checked} onChange={() => handleToggle(f)} />
+                <span style={{ fontSize: 13 }}>★ {f.name}</span>
+                <span style={{ fontSize: 12, color: '#aaa', marginLeft: 'auto' }}>{f.count} 题</span>
+              </label>
+            );
+          })}
+        </div>
+
+        <div style={{ display: 'flex', gap: 6, paddingTop: 10, borderTop: '1px solid #e0e0e0' }}>
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleCreateAndAdd()}
+            placeholder="新建并加入"
+            style={{
+              flex: 1, padding: '7px 12px', borderRadius: 7,
+              border: '1px solid #e0e0e0', fontSize: 13, outline: 'none', background: '#f9f9f7',
+            }}
+          />
+          <button onClick={handleCreateAndAdd} style={{
+            padding: '7px 14px', background: '#1D9E75', color: '#fff',
+            border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+          }}>新建</button>
+        </div>
+      </div>
     </div>
   );
 }
