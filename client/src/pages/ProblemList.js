@@ -141,8 +141,17 @@ export default function ProblemList() {
         </div>
       )}
 
-      {/* 进度环 */}
-      {stats && stats.byDifficulty && <ProgressRing stats={stats} />}
+      {/* 进度环 + 热力图（同一行） */}
+      {(stats?.byDifficulty || heatmap.length > 0) && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(360px, auto) minmax(0, 1fr)',
+          gap: 14, marginBottom: 14, alignItems: 'stretch',
+        }}>
+          {stats?.byDifficulty && <ProgressRing stats={stats} />}
+          {heatmap.length > 0 && <Heatmap data={heatmap} />}
+        </div>
+      )}
 
       {/* 进度条 */}
       {stats && (
@@ -157,9 +166,6 @@ export default function ProblemList() {
           </div>
         </div>
       )}
-
-      {/* 热力图 */}
-      {heatmap.length > 0 && <Heatmap data={heatmap} />}
 
       {/* 搜索 + 过滤栏 */}
       <div style={{
@@ -392,8 +398,8 @@ function ProgressRing({ stats }) {
 
   return (
     <div style={{
-      ...card, padding: '20px 24px', marginBottom: 14,
-      display: 'flex', alignItems: 'center', gap: 32, flexWrap: 'wrap',
+      ...card, padding: '20px 24px',
+      display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap',
     }}>
       {/* 圆环 */}
       <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
@@ -547,7 +553,7 @@ function Heatmap({ data }) {
   const [tooltip, setTooltip] = useState(null);
 
   return (
-    <div style={{ ...card, padding: '14px 16px', marginBottom: 14 }}>
+    <div style={{ ...card, padding: '14px 16px' }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 10 }}>提交热力图</div>
       <div style={{ overflowX: 'auto' }}>
         <svg
