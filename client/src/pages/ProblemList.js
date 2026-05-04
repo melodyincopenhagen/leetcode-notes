@@ -95,10 +95,11 @@ export default function ProblemList() {
       )
     : problems;
 
-  const handleSync = async () => {
+  const handleSync = async (full = false) => {
     setSyncing(true);
     try {
-      const r = await axios.post('http://localhost:3001/api/sync');
+      const url = 'http://localhost:3001/api/sync' + (full ? '?full=1' : '');
+      const r = await axios.post(url);
       alert(`同步完成，共 ${r.data.synced} 题`);
       load();
     } catch (e) {
@@ -113,17 +114,34 @@ export default function ProblemList() {
       {/* 顶部标题行 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1a1a1a' }}>我的刷题记录</h1>
-        <button onClick={handleSync} disabled={syncing} style={{
-          padding: '8px 16px', borderRadius: 8, border: 'none',
-          cursor: syncing ? 'default' : 'pointer',
-          background: syncing ? '#e0e0e0' : '#1D9E75',
-          color: syncing ? '#888' : '#fff',
-          fontSize: 13, fontWeight: 600,
-          display: 'flex', alignItems: 'center', gap: 6,
-          transition: 'all .2s',
-        }}>
-          {syncing ? '同步中...' : '↻ 同步题目'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => handleSync(false)} disabled={syncing} style={{
+            padding: '8px 16px', borderRadius: 8, border: 'none',
+            cursor: syncing ? 'default' : 'pointer',
+            background: syncing ? '#e0e0e0' : '#1D9E75',
+            color: syncing ? '#888' : '#fff',
+            fontSize: 13, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 6,
+            transition: 'all .2s',
+          }}>
+            {syncing ? '同步中...' : '↻ 同步新题'}
+          </button>
+          <button
+            onClick={() => {
+              if (window.confirm('全量同步会扫描所有历史 AC 提交，耗时较长。继续？')) handleSync(true);
+            }}
+            disabled={syncing}
+            title="重新扫描所有 AC 提交"
+            style={{
+              padding: '8px 12px', borderRadius: 8,
+              border: '1px solid #d0d0d0', background: '#fff',
+              cursor: syncing ? 'default' : 'pointer',
+              color: '#555', fontSize: 12,
+            }}
+          >
+            全量
+          </button>
+        </div>
       </div>
 
       {/* 统计概览 */}

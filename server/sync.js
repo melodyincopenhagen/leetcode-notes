@@ -24,21 +24,43 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-async function fetchSolvedProblems(session) {
+// 并发池：最多 concurrency 个 worker 同时执行 fn(item)
+async function pMap(items, concurrency, fn) {
+  const results = new Array(items.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (true) {
+      const idx = i++;
+      if (idx >= items.length) return;
+      results[idx] = await fn(items[idx], idx);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+async function fetchSolvedProblems(session, { full = false } = {}) {
   // 1. 验证登录
   const me = await gql(session, `{ userStatus { username isSignedIn } }`);
   const userStatus = me?.data?.userStatus;
   if (!userStatus?.isSignedIn) throw new Error('Cookie 已失效，请重新获取 LEETCODE_SESSION');
 
   const username = userStatus.username;
-  console.log(`[sync] 登录用户: ${username}`);
+  console.log(`[sync] 登录用户: ${username}（模式：${full ? '全量' : '增量'}）`);
 
-  // 2. 分页拉取已通过的提交记录
+  // DB 里已存在的 slug -> { has_description }
+  const existing = new Map();
+  for (const row of db.prepare('SELECT title_slug, description FROM problems').all()) {
+    existing.set(row.title_slug, { hasDescription: !!row.description });
+  }
+
   const problems = [];
+  const seenSlug = new Set();
   let offset = 0;
   const limit = 20;
+  let stop = false;
 
-  while (true) {
+  outer: while (!stop) {
     const data = await gql(session, `
       query submissionList($offset: Int!, $limit: Int!) {
         submissionList(offset: $offset, limit: $limit) {
@@ -59,8 +81,20 @@ async function fetchSolvedProblems(session) {
     const accepted = list.submissions.filter(s => s.statusDisplay === 'Accepted');
 
     for (const sub of accepted) {
-      if (problems.find(p => p.title_slug === sub.titleSlug)) continue;
+      if (seenSlug.has(sub.titleSlug)) continue;
+      seenSlug.add(sub.titleSlug);
 
+      const known = existing.get(sub.titleSlug);
+
+      // 增量模式：碰到第一道已存在且已有描述的题就停（按时间倒序，更老的也都同步过了）
+      if (!full && known && known.hasDescription) {
+        console.log(`[sync] 增量到达已知题 ${sub.titleSlug}，提前结束`);
+        stop = true;
+        break outer;
+      }
+
+      // 已知但缺描述：只补描述（leetcode_id 已经有了，但简化起见走同样的 upsert）
+      // 未知：拉取详情
       const detail = await fetchProblemDetail(session, sub.titleSlug);
       if (!detail.questionFrontendId) continue;
 
@@ -73,7 +107,7 @@ async function fetchSolvedProblems(session) {
       });
 
       console.log(`[sync] 已获取: #${detail.questionFrontendId} ${sub.title}`);
-      await sleep(200);
+      await sleep(50);
     }
 
     if (!list.hasNext) break;
@@ -100,9 +134,12 @@ async function fetchProblemDetail(session, titleSlug) {
   }
 }
 
-async function syncToDb(session) {
-  const problems = await fetchSolvedProblems(session);
-  if (!problems.length) return { synced: 0 };
+async function syncToDb(session, opts = {}) {
+  const problems = await fetchSolvedProblems(session, opts);
+  if (!problems.length) {
+    console.log('[sync] 无新题');
+    return { synced: 0 };
+  }
 
   const insert = db.prepare(`
     INSERT INTO problems (leetcode_id, title, title_slug, difficulty, description)

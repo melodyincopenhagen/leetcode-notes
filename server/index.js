@@ -51,7 +51,8 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 // ── 手动触发同步 ──────────────────────────────────────────
 app.post('/api/sync', async (req, res) => {
   try {
-    const result = await syncToDb(getSession());
+    const full = req.query.full === '1' || req.body?.full === true;
+    const result = await syncToDb(getSession(), { full });
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
