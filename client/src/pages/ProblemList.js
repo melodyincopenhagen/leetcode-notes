@@ -6,6 +6,7 @@ import {
 import axios from 'axios';
 import StatusBadge, { STATUS_MAP } from '../components/StatusBadge';
 import DifficultyBadge from '../components/DifficultyBadge';
+import { formatDatePT, todayStartPT, ptIsoDate } from '../utils/time';
 
 const STATUSES = [
   { value: '', label: '全部状态' },
@@ -303,7 +304,7 @@ function ProblemRow({ p, last, onClick }) {
         )}
       </td>
       <td style={{ padding: '12px 16px', color: '#bbb', fontSize: 12, whiteSpace: 'nowrap' }}>
-        {p.attempted_at ? p.attempted_at.slice(0, 10) : '—'}
+        {p.attempted_at ? formatDatePT(p.attempted_at) : '—'}
       </td>
     </tr>
   );
@@ -507,9 +508,8 @@ function Heatmap({ data }) {
   const startDate = new Date('2026-04-01T00:00:00');
   startDate.setDate(startDate.getDate() - startDate.getDay());
 
-  // 今天（太平洋时间 UTC-7）
-  const nowPT = new Date(Date.now() - 7 * 60 * 60 * 1000);
-  const todayPT = new Date(nowPT.toISOString().slice(0, 10) + 'T00:00:00');
+  // 今天（太平洋时间，自动处理 PST/PDT）
+  const todayPT = todayStartPT();
 
   // 生成所有天，按列（每列=一周）组织
   const weeks = [];
@@ -517,7 +517,7 @@ function Heatmap({ data }) {
   while (cur <= end) {
     const week = [];
     for (let d = 0; d < 7; d++) {
-      const iso = cur.toISOString().slice(0, 10);
+      const iso = ptIsoDate(cur);
       const beforeStart = cur < new Date('2026-04-01T00:00:00');
       const isFuture = cur > todayPT;
       week.push({ date: iso, count: countMap[iso] || 0, future: isFuture, faded: beforeStart });

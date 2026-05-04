@@ -9,6 +9,7 @@ import {
 } from '../api';
 import StatusBadge, { STATUS_MAP } from '../components/StatusBadge';
 import DifficultyBadge from '../components/DifficultyBadge';
+import { formatDatePT } from '../utils/time';
 
 export default function ProblemDetail() {
   const { id } = useParams();
@@ -258,7 +259,7 @@ export default function ProblemDetail() {
                   background: '#f9f9f7', border: '1px solid #e0e0e0',
                   borderRadius: 8, padding: '5px 10px', fontSize: 12,
                 }}>
-                  <span style={{ color: '#aaa' }}>{r.attempted_at?.slice(0, 10)}</span>
+                  <span style={{ color: '#aaa' }}>{formatDatePT(r.attempted_at)}</span>
                   <StatusBadge status={r.status} />
                   <button
                     onClick={(e) => {

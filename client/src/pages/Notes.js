@@ -3,6 +3,7 @@ import MDEditor from '@uiw/react-md-editor';
 import rehypePrism from 'rehype-prism-plus';
 import remarkBreaks from 'remark-breaks';
 import { getNotes, getNote, createNote, updateNote, deleteNote } from '../api';
+import { formatDatePT } from '../utils/time';
 
 const border = '#e0e0e0';
 
@@ -536,7 +537,7 @@ function NoteEditor({ noteId, onUpdated }) {
               保存中...
             </span>
           )}
-          <span style={{ fontSize: 11, color: '#bbb' }}>{note.updated_at?.slice(0, 10)} 更新</span>
+          <span style={{ fontSize: 11, color: '#bbb' }}>{formatDatePT(note.updated_at)} 更新</span>
         </div>
       </div>
 

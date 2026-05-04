@@ -315,16 +315,26 @@ app.get('/api/stats', (req, res) => {
   res.json({ total, statusCounts, untouched, solved, attempting, byDifficulty });
 });
 
-// ── 热力图（每天提交次数） ────────────────────────────────
+// ── 热力图（每天提交次数，按太平洋时间分组） ───────────────
 app.get('/api/heatmap', (req, res) => {
-  const rows = db.prepare(`
-    SELECT DATE(attempted_at, '-7 hours') AS day, COUNT(*) AS count
-    FROM records
-    GROUP BY DATE(attempted_at, '-7 hours')
-    ORDER BY day ASC
-  `).all();
+  const rows = db.prepare('SELECT attempted_at FROM records').all();
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  const counts = new Map();
+  for (const { attempted_at } of rows) {
+    if (!attempted_at) continue;
+    // SQLite datetime('now') 输出 UTC，形如 "2026-05-02 03:15:00"
+    const d = new Date(attempted_at.replace(' ', 'T') + 'Z');
+    if (isNaN(d)) continue;
+    const day = fmt.format(d); // YYYY-MM-DD（PT，自动处理 PST/PDT）
+    counts.set(day, (counts.get(day) || 0) + 1);
+  }
+  const result = Array.from(counts, ([day, count]) => ({ day, count }))
+    .sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
   res.set('Cache-Control', 'no-store');
-  res.json(rows);
+  res.json(result);
 });
 
 // ── 随机题目 ──────────────────────────────────────────────
