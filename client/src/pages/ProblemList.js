@@ -100,8 +100,21 @@ export default function ProblemList() {
     try {
       const url = 'http://localhost:3001/api/sync' + (full ? '?full=1' : '');
       const r = await axios.post(url);
-      alert(`同步完成，共 ${r.data.synced} 题`);
+      const { synced, newProblems = [] } = r.data;
       load();
+      if (newProblems.length === 0) {
+        alert(`同步完成，共 ${synced} 题（无新题）`);
+      } else {
+        const ok = window.confirm(
+          `同步完成，新增 ${newProblems.length} 道新题。点击"确定"开始依次标记。`
+        );
+        if (ok) {
+          // 把第一题之后的剩余 id 入队，详情页标记完后自动跳到下一题
+          const queue = newProblems.slice(1).map(p => p.id);
+          sessionStorage.setItem('markQueue', JSON.stringify(queue));
+          navigate(`/problems/${newProblems[0].id}`);
+        }
+      }
     } catch (e) {
       alert('同步失败：' + (e.response?.data?.error || e.message));
     }
@@ -373,7 +386,7 @@ const selectStyle = {
 };
 
 function ProgressRing({ stats }) {
-  const { byDifficulty, total, solved, attempting } = stats;
+  const { byDifficulty, total, solved } = stats;
   const easy = byDifficulty.Easy;
   const med = byDifficulty.Medium;
   const hard = byDifficulty.Hard;
@@ -479,9 +492,6 @@ function ProgressRing({ stats }) {
           </div>
           <div style={{ fontSize: 12, color: '#1D9E75', marginTop: 2, fontWeight: 600 }}>
             ✓ Solved
-          </div>
-          <div style={{ fontSize: 11, color: '#888', marginTop: 12 }}>
-            <span style={{ fontWeight: 600, color: '#555' }}>{attempting}</span> Attempting
           </div>
         </div>
       </div>

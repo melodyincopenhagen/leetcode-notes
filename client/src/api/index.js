@@ -12,6 +12,8 @@ export const getHeatmap = () => api.get('/heatmap');
 export const getRandom = (filters = {}) => api.get('/random', { params: filters });
 export const getTags = () => api.get('/tags');
 export const deleteRecord = (recordId) => api.delete(`/records/${recordId}`);
+export const getSimilar = (id, refresh = false) =>
+  api.get(`/problems/${id}/similar`, { params: refresh ? { refresh: 1 } : {} });
 
 // ── 收藏夹 ────────────────────────────────────────────────
 export const getFavorites = () => api.get('/favorites');

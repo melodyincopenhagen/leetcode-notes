@@ -20,7 +20,30 @@
       "Bash(kill 20724 35587)",
       "Bash(node -e ':*)",
       "Bash(grep -A5 \"\\\\.w-md-editor-text-pre,$\" /Users/yuexishen/Desktop/其它/leetcode_notes/client/node_modules/@uiw/react-md-editor/dist/mdeditor.css)",
-      "Bash(grep -v \"^--$\")"
+      "Bash(grep -v \"^--$\")",
+      "Bash(brew install:*)",
+      "Bash(gh auth:*)",
+      "Read(//Users/yuexishen/.config/**)",
+      "Read(//Users/yuexishen/.config/gh/**)",
+      "Bash(git push:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(node -e ' *)",
+      "Bash(sqlite3 \"/Users/yuexishen/Desktop/其它/leetcode_notes/server/leetcode.db\" \"SELECT DATE\\(attempted_at, '-7 hours'\\) AS day, COUNT\\(*\\) AS count FROM records GROUP BY day ORDER BY day DESC LIMIT 10;\")",
+      "Bash(sqlite3 \"/Users/yuexishen/Desktop/其它/leetcode_notes/server/leetcode.db\" \"SELECT r.id, r.problem_id, p.leetcode_id, r.status, r.attempted_at FROM records r JOIN problems p ON p.id=r.problem_id WHERE p.leetcode_id=167 ORDER BY r.attempted_at DESC;\")",
+      "Read(//opt/homebrew/bin/**)",
+      "Bash(command -v nvm)",
+      "Bash(/opt/homebrew/bin/node --version)",
+      "Bash(/opt/homebrew/bin/node -e ' *)",
+      "Bash(/opt/homebrew/bin/node index.js)",
+      "Bash(curl -s -X DELETE http://localhost:3001/api/records/72)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\([x for x in d if x['day']=='2026-04-24']\\)\")",
+      "Bash(sqlite3 \"/Users/yuexishen/Desktop/其它/leetcode_notes/server/leetcode.db\" \"INSERT INTO records \\(id, problem_id, status, notes, remarks, attempted_at\\) VALUES \\(72, 1115, 'forgotten', '', '', '2026-04-25 03:12:37'\\);\")",
+      "Bash(pkill -f \"node index.js\")",
+      "Bash(git commit -m ' *)",
+      "Bash(lsof -nP -iTCP:3001 -sTCP:LISTEN)",
+      "Bash(git check-ignore *)",
+      "Bash(sqlite3 /Users/yuexishen/Desktop/其它/leetcode_notes/server/leetcode.db \"SELECT COUNT\\(*\\) AS total, SUM\\(CASE WHEN description IS NULL OR description = '' THEN 1 ELSE 0 END\\) AS no_desc FROM problems;\")",
+      "Bash(sqlite3 /Users/yuexishen/Desktop/其它/leetcode_notes/server/leetcode.db \"SELECT leetcode_id, title_slug FROM problems WHERE leetcode_id IN \\(678, 79, 5, 1\\) ORDER BY leetcode_id;\")"
     ]
   }
 }

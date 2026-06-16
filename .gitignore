@@ -2,3 +2,7 @@ node_modules/
 server/config.json
 server/leetcode.db
 server/uploads/
+.DS_Store
+.logs/
+assets/logo.iconset/
+assets/logo-1024.png

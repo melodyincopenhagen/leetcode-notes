@@ -78,4 +78,13 @@ if (!notesCols.includes('sort_order')) {
   db.exec("ALTER TABLE notes ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0");
 }
 
+// problems.similar_questions: 缓存 LeetCode 返回的 similar questions JSON 字符串
+const problemsCols = db.pragma('table_info(problems)').map(c => c.name);
+if (!problemsCols.includes('similar_questions')) {
+  db.exec("ALTER TABLE problems ADD COLUMN similar_questions TEXT DEFAULT NULL");
+}
+if (!problemsCols.includes('similar_fetched_at')) {
+  db.exec("ALTER TABLE problems ADD COLUMN similar_fetched_at TEXT DEFAULT NULL");
+}
+
 module.exports = db;

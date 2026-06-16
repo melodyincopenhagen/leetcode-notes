@@ -5,7 +5,7 @@ import rehypePrism from 'rehype-prism-plus';
 import remarkBreaks from 'remark-breaks';
 import {
   getProblem, addRecord, updateLatest, updateTags, uploadImage, deleteRecord, getRandom,
-  getFavorites, createFavorite, addProblemToFavorite, removeProblemFromFavorite,
+  getFavorites, createFavorite, addProblemToFavorite, removeProblemFromFavorite, getSimilar,
 } from '../api';
 import StatusBadge, { STATUS_MAP } from '../components/StatusBadge';
 import DifficultyBadge from '../components/DifficultyBadge';
@@ -21,6 +21,30 @@ export default function ProblemDetail() {
   const [activeTab, setActiveTab] = useState('desc');
   const [allFavorites, setAllFavorites] = useState([]);
   const [showFavPicker, setShowFavPicker] = useState(false);
+  const [markQueue, setMarkQueue] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('markQueue') || '[]'); }
+    catch { return []; }
+  });
+  // 同一批"标记队列"中已经处理的数量（用于显示 X/N）
+  const [queueIndex, setQueueIndex] = useState(() => {
+    const n = parseInt(sessionStorage.getItem('markQueueIndex') || '0', 10);
+    return isNaN(n) ? 0 : n;
+  });
+  const [queueTotal, setQueueTotal] = useState(() => {
+    const n = parseInt(sessionStorage.getItem('markQueueTotal') || '0', 10);
+    return isNaN(n) ? 0 : n;
+  });
+
+  // 同步刚完成跳转到第一题时，初始化 total = queue.length + 1（含当前题）
+  useEffect(() => {
+    if (queueTotal === 0 && markQueue.length > 0) {
+      const total = markQueue.length + 1;
+      setQueueTotal(total);
+      setQueueIndex(1);
+      sessionStorage.setItem('markQueueTotal', String(total));
+      sessionStorage.setItem('markQueueIndex', '1');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadFavorites = () => getFavorites().then(r => setAllFavorites(r.data));
   useEffect(() => { loadFavorites(); }, []);
@@ -36,9 +60,42 @@ export default function ProblemDetail() {
 
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const advanceQueue = () => {
+    if (markQueue.length === 0) {
+      // 队列结束，清理
+      sessionStorage.removeItem('markQueue');
+      sessionStorage.removeItem('markQueueIndex');
+      sessionStorage.removeItem('markQueueTotal');
+      setQueueTotal(0);
+      setQueueIndex(0);
+      navigate('/');
+      return;
+    }
+    const [next, ...rest] = markQueue;
+    sessionStorage.setItem('markQueue', JSON.stringify(rest));
+    const newIndex = queueIndex + 1;
+    sessionStorage.setItem('markQueueIndex', String(newIndex));
+    setMarkQueue(rest);
+    setQueueIndex(newIndex);
+    navigate(`/problems/${next}`);
+  };
+
+  const exitQueue = () => {
+    sessionStorage.removeItem('markQueue');
+    sessionStorage.removeItem('markQueueIndex');
+    sessionStorage.removeItem('markQueueTotal');
+    setMarkQueue([]);
+    setQueueTotal(0);
+    setQueueIndex(0);
+  };
+
   const handleStatus = async (status) => {
     await addRecord(id, { status, notes, remarks });
-    load();
+    if (queueTotal > 0) {
+      advanceQueue();
+    } else {
+      load();
+    }
   };
 
   const saveRemarks = async () => {
@@ -65,7 +122,35 @@ export default function ProblemDetail() {
   const latestRecord = problem.records?.[0];
 
   return (
-    <div style={{ padding: '28px 36px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{
+      padding: '28px 36px', maxWidth: 1400, margin: '0 auto',
+      display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 24, alignItems: 'start',
+    }}>
+      <div style={{ minWidth: 0 }}>
+
+      {/* 标记队列进度条 */}
+      {queueTotal > 0 && (
+        <div style={{
+          background: '#fff8e1', border: '1px solid #f0d68c',
+          borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <div style={{ fontSize: 13, color: '#7a5a00' }}>
+            正在标记新同步的题：<b>{queueIndex}/{queueTotal}</b>
+            {markQueue.length > 0 && <span style={{ color: '#a07a30', marginLeft: 6 }}>（剩余 {markQueue.length} 题）</span>}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={advanceQueue} style={{
+              padding: '5px 12px', borderRadius: 6, border: '1px solid #d0a35e',
+              background: '#fff', color: '#7a5a00', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+            }}>跳过 →</button>
+            <button onClick={exitQueue} style={{
+              padding: '5px 10px', borderRadius: 6, border: '1px solid #e0e0e0',
+              background: '#fff', color: '#888', cursor: 'pointer', fontSize: 12,
+            }}>退出</button>
+          </div>
+        </div>
+      )}
 
       {/* 顶部操作栏 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -341,7 +426,112 @@ export default function ProblemDetail() {
           </div>
         )}
       </div>
+      </div>
+
+      {/* 右侧 Similar Questions 边栏 */}
+      <SimilarSidebar problemId={id} navigate={navigate} />
     </div>
+  );
+}
+
+function SimilarSidebar({ problemId, navigate }) {
+  const [list, setList] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const load = (refresh = false) => {
+    setLoading(true);
+    setError(null);
+    getSimilar(problemId, refresh)
+      .then(r => setList(r.data))
+      .catch(e => setError(e.response?.data?.error || e.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(false); }, [problemId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const diffColor = (d) => d === 'Easy' ? '#1D9E75' : d === 'Hard' ? '#c8412b' : '#d99022';
+
+  return (
+    <aside style={{
+      background: '#fff', borderRadius: 14, padding: '18px 18px 14px',
+      boxShadow: '0 1px 3px rgba(0,0,0,.06)', position: 'sticky', top: 16,
+      maxHeight: 'calc(100vh - 32px)', overflow: 'auto',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a' }}>🔗 Similar Questions</div>
+        <button
+          onClick={() => load(true)}
+          disabled={loading}
+          title="重新抓取"
+          style={{
+            background: 'none', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+            color: '#888', fontSize: 14, padding: 2,
+          }}
+        >↻</button>
+      </div>
+
+      {loading && !list && <div style={{ color: '#888', fontSize: 12 }}>加载中...</div>}
+      {error && <div style={{ color: '#c8412b', fontSize: 12 }}>加载失败：{error}</div>}
+      {list && list.length === 0 && <div style={{ color: '#aaa', fontSize: 12 }}>没有非会员的相似题</div>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {list?.map(q => {
+          const handleClick = (e) => {
+            if (q.solved && q.internal_id) {
+              e.preventDefault();
+              navigate(`/problems/${q.internal_id}`);
+            }
+            // 否则保持 <a> 的默认行为：跳到 leetcode
+          };
+          const href = q.solved && q.internal_id
+            ? `/problems/${q.internal_id}`
+            : `https://leetcode.com/problems/${q.title_slug}/`;
+          const external = !q.solved || !q.internal_id;
+
+          return (
+            <a
+              key={q.title_slug}
+              href={href}
+              onClick={handleClick}
+              target={external ? '_blank' : undefined}
+              rel={external ? 'noopener noreferrer' : undefined}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 10px', borderRadius: 8,
+                background: q.solved ? '#f0f8f4' : '#f9f9f7',
+                border: `1px solid ${q.solved ? '#cce8da' : '#ececec'}`,
+                textDecoration: 'none', color: '#1a1a1a',
+                transition: 'background .12s, border .12s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = q.solved ? '#e3f2eb' : '#f1efe8'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = q.solved ? '#f0f8f4' : '#f9f9f7'; }}
+            >
+              <span style={{
+                fontSize: 11, color: '#888', fontWeight: 600, minWidth: 36,
+              }}>{q.leetcode_id != null ? `#${q.leetcode_id}` : '#?'}</span>
+              <span style={{
+                flex: 1, fontSize: 12.5, lineHeight: 1.35, color: '#1a1a1a',
+                overflow: 'hidden', textOverflow: 'ellipsis',
+              }} title={q.title}>{q.title}</span>
+              <span style={{
+                fontSize: 10.5, fontWeight: 700, color: diffColor(q.difficulty),
+                background: diffColor(q.difficulty) + '1a',
+                padding: '2px 6px', borderRadius: 4, flexShrink: 0,
+              }}>{q.difficulty?.[0] || '?'}</span>
+              <span
+                title={q.solved ? '已做过 — 点击查看笔记' : '未做 — 点击去 LeetCode'}
+                style={{
+                  fontSize: 11, fontWeight: 700, flexShrink: 0,
+                  color: q.solved ? '#1D9E75' : '#aaa',
+                  minWidth: 14, textAlign: 'center',
+                }}
+              >{q.solved ? '✓' : '○'}</span>
+            </a>
+          );
+        })}
+      </div>
+    </aside>
   );
 }
 

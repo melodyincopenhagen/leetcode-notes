@@ -134,12 +134,43 @@ async function fetchProblemDetail(session, titleSlug) {
   }
 }
 
+// 返回 [{ title, titleSlug, difficulty, isPaidOnly }, ...]，只返回非会员题
+async function fetchSimilarQuestions(session, titleSlug) {
+  const data = await gql(session, `
+    query similarQuestions($titleSlug: String!) {
+      question(titleSlug: $titleSlug) {
+        similarQuestions
+      }
+    }
+  `, { titleSlug });
+  const raw = data?.data?.question?.similarQuestions;
+  if (typeof raw !== 'string' || !raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(q => !q.isPaidOnly).map(q => ({
+      title: q.title,
+      titleSlug: q.titleSlug,
+      difficulty: q.difficulty,
+      isPaidOnly: !!q.isPaidOnly,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 async function syncToDb(session, opts = {}) {
   const problems = await fetchSolvedProblems(session, opts);
   if (!problems.length) {
     console.log('[sync] 无新题');
-    return { synced: 0 };
+    return { synced: 0, newProblems: [] };
   }
+
+  // 区分"真正的新题"和"已存在的题"
+  const existingIds = new Set(
+    db.prepare('SELECT leetcode_id FROM problems').all().map(r => r.leetcode_id)
+  );
+  const trulyNew = problems.filter(p => !existingIds.has(p.leetcode_id));
 
   const insert = db.prepare(`
     INSERT INTO problems (leetcode_id, title, title_slug, difficulty, description)
@@ -152,8 +183,18 @@ async function syncToDb(session, opts = {}) {
   `);
 
   db.transaction(() => { for (const p of problems) insert.run(p); })();
-  console.log(`[sync] 完成，共同步 ${problems.length} 题`);
-  return { synced: problems.length };
+  console.log(`[sync] 完成，共同步 ${problems.length} 题（其中 ${trulyNew.length} 道为新题）`);
+
+  // 把新题的内部 id 查出来返回
+  const lookupId = db.prepare('SELECT id FROM problems WHERE leetcode_id = ?');
+  const newProblems = trulyNew.map(p => ({
+    id: lookupId.get(p.leetcode_id)?.id,
+    leetcode_id: p.leetcode_id,
+    title: p.title,
+    difficulty: p.difficulty,
+  })).filter(p => p.id);
+
+  return { synced: problems.length, newProblems };
 }
 
-module.exports = { syncToDb };
+module.exports = { syncToDb, fetchSimilarQuestions, fetchProblemDetail };

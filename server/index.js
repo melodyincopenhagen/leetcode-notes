@@ -5,7 +5,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const db = require('./db');
-const { syncToDb } = require('./sync');
+const { syncToDb, fetchSimilarQuestions, fetchProblemDetail } = require('./sync');
 
 function getSession() {
   const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
@@ -139,6 +139,88 @@ app.get('/api/problems/:id', (req, res) => {
   `).all(req.params.id);
 
   res.json({ ...problem, records, tags, favorites });
+});
+
+// ── Similar Questions（带缓存） ───────────────────────────
+app.get('/api/problems/:id/similar', async (req, res) => {
+  try {
+    const problem = db.prepare('SELECT id, title_slug, similar_questions, similar_fetched_at FROM problems WHERE id = ?').get(req.params.id);
+    if (!problem) return res.status(404).json({ error: 'Not found' });
+
+    const refresh = req.query.refresh === '1';
+    let raw = problem.similar_questions;
+
+    if (refresh || !raw) {
+      const list = await fetchSimilarQuestions(getSession(), problem.title_slug);
+      raw = JSON.stringify(list);
+      db.prepare("UPDATE problems SET similar_questions = ?, similar_fetched_at = datetime('now') WHERE id = ?")
+        .run(raw, problem.id);
+    }
+
+    let list;
+    try { list = JSON.parse(raw) || []; } catch { list = []; }
+
+    // 用 DB 里的 slug 反查 internal id / leetcode_id / status
+    const slugs = list.map(q => q.titleSlug);
+    let dbMap = new Map();
+    if (slugs.length) {
+      const placeholders = slugs.map(() => '?').join(',');
+      const rows = db.prepare(`
+        SELECT p.id AS internal_id, p.leetcode_id, p.title_slug, p.difficulty,
+               (SELECT r.status FROM records r WHERE r.problem_id = p.id ORDER BY r.attempted_at DESC LIMIT 1) AS status,
+               (SELECT 1 FROM records r2 WHERE r2.problem_id = p.id LIMIT 1) AS has_record
+        FROM problems p
+        WHERE p.title_slug IN (${placeholders})
+      `).all(...slugs);
+      for (const row of rows) dbMap.set(row.title_slug, row);
+    }
+
+    // 对于不在 DB 的题，frontend_id 拉一次（可能比较慢，但用户能容忍 — 已经缓存到 similar_questions）
+    // 优化：把已知的 frontend_id 缓存到 raw 里。先看 list 是否已经有 leetcode_id。
+    const needsFrontendId = list.filter(q => !dbMap.has(q.titleSlug) && q.leetcode_id == null);
+    if (needsFrontendId.length) {
+      const session = getSession();
+      // 限制并发
+      const concurrency = 5;
+      let i = 0;
+      await Promise.all(Array.from({ length: Math.min(concurrency, needsFrontendId.length) }, async () => {
+        while (true) {
+          const idx = i++;
+          if (idx >= needsFrontendId.length) return;
+          const q = needsFrontendId[idx];
+          try {
+            const detail = await fetchProblemDetail(session, q.titleSlug);
+            if (detail?.questionFrontendId) {
+              q.leetcode_id = parseInt(detail.questionFrontendId);
+              if (detail.difficulty) q.difficulty = detail.difficulty;
+            }
+          } catch { /* ignore */ }
+        }
+      }));
+      // 写回缓存
+      db.prepare("UPDATE problems SET similar_questions = ? WHERE id = ?")
+        .run(JSON.stringify(list), problem.id);
+    }
+
+    const result = list.map(q => {
+      const dbRow = dbMap.get(q.titleSlug);
+      return {
+        title: q.title,
+        title_slug: q.titleSlug,
+        difficulty: dbRow?.difficulty || q.difficulty,
+        leetcode_id: dbRow?.leetcode_id ?? q.leetcode_id ?? null,
+        in_db: !!dbRow,
+        internal_id: dbRow?.internal_id ?? null,
+        solved: !!dbRow?.has_record,
+        status: dbRow?.status || null,
+      };
+    });
+
+    res.json(result);
+  } catch (e) {
+    console.error('[similar]', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── 添加/更新记录 ─────────────────────────────────────────
