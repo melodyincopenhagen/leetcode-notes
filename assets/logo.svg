@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a2a35"/>
+      <stop offset="1" stop-color="#1a1a22"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f3f4f6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded square background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="220" ry="220" fill="url(#bg)"/>
+
+  <!-- left brace { -->
+  <path d="M 285 280
+           C 220 280, 240 380, 230 470
+           C 222 505, 195 512, 175 512
+           C 195 512, 222 519, 230 554
+           C 240 644, 220 744, 285 744"
+        stroke="#ffa116" stroke-width="42" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- right brace } -->
+  <path d="M 739 280
+           C 804 280, 784 380, 794 470
+           C 802 505, 829 512, 849 512
+           C 829 512, 802 519, 794 554
+           C 784 644, 804 744, 739 744"
+        stroke="#ffa116" stroke-width="42" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- notebook page -->
+  <rect x="360" y="330" width="304" height="364" rx="28" ry="28" fill="url(#page)" stroke="#d1d5db" stroke-width="6"/>
+
+  <!-- spiral binding holes -->
+  <circle cx="402" cy="380" r="10" fill="#ffa116"/>
+  <circle cx="402" cy="470" r="10" fill="#ffa116"/>
+  <circle cx="402" cy="560" r="10" fill="#ffa116"/>
+  <circle cx="402" cy="650" r="10" fill="#ffa116"/>
+
+  <!-- note lines -->
+  <line x1="448" y1="395" x2="624" y2="395" stroke="#4b5563" stroke-width="14" stroke-linecap="round"/>
+  <line x1="448" y1="470" x2="610" y2="470" stroke="#9ca3af" stroke-width="12" stroke-linecap="round"/>
+  <line x1="448" y1="540" x2="624" y2="540" stroke="#9ca3af" stroke-width="12" stroke-linecap="round"/>
+  <line x1="448" y1="610" x2="572" y2="610" stroke="#9ca3af" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- LC badge -->
+  <text x="512" y="858" text-anchor="middle"
+        font-family="-apple-system, SF Pro Display, Helvetica, Arial, sans-serif"
+        font-weight="800" font-size="92" fill="#ffa116" letter-spacing="6">LC NOTES</text>
+</svg>
