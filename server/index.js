@@ -211,7 +211,7 @@ app.get('/api/problems/:id/similar', async (req, res) => {
         leetcode_id: dbRow?.leetcode_id ?? q.leetcode_id ?? null,
         in_db: !!dbRow,
         internal_id: dbRow?.internal_id ?? null,
-        solved: !!dbRow?.has_record,
+        solved: !!dbRow,
         status: dbRow?.status || null,
       };
     });
